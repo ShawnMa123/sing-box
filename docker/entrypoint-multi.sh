@@ -4,6 +4,12 @@ set -e
 # 多协议多端口入口脚本
 # 支持在单个容器中部署多个协议
 
+# 加载平台兼容性工具
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "$SCRIPT_DIR/platform-utils.sh" ]]; then
+    source "$SCRIPT_DIR/platform-utils.sh"
+fi
+
 # 颜色定义
 RED='\033[0;31m'
 GREEN='\033[0;32m'

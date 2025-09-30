@@ -19,9 +19,23 @@ log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 
-# 生成UUID
+# 生成UUID (兼容多平台)
 generate_uuid() {
-    cat /proc/sys/kernel/random/uuid
+    if command -v generate_uuid_portable &> /dev/null; then
+        generate_uuid_portable
+    elif [[ -r /proc/sys/kernel/random/uuid ]]; then
+        cat /proc/sys/kernel/random/uuid
+    elif command -v uuidgen &> /dev/null; then
+        uuidgen | tr '[:upper:]' '[:lower:]'
+    else
+        # 后备方案
+        printf '%08x-%04x-%04x-%04x-%012x\n' \
+            $RANDOM$RANDOM \
+            $RANDOM \
+            $((RANDOM | 0x4000)) \
+            $((RANDOM | 0x8000)) \
+            $RANDOM$RANDOM$RANDOM
+    fi
 }
 
 # 生成Reality密钥对
@@ -31,20 +45,31 @@ generate_reality_keys() {
     echo "$keys" | grep "PublicKey:" | cut -d' ' -f2
 }
 
-# 生成SS2022密码
+# 生成SS2022密码 (兼容多平台)
 generate_ss2022_password() {
     local method="$1"
+    local length
+
     case "$method" in
         *aes-128*)
-            openssl rand -base64 16
+            length=16
             ;;
         *aes-256*|*chacha20*)
-            openssl rand -base64 32
+            length=32
             ;;
         *)
-            openssl rand -base64 32
+            length=32
             ;;
     esac
+
+    if command -v openssl &> /dev/null; then
+        openssl rand -base64 $length
+    elif [[ -r /dev/urandom ]]; then
+        head -c $length /dev/urandom | base64 | tr -d '\n'
+    else
+        # 后备方案：生成随机字符串
+        cat /dev/urandom | tr -dc 'A-Za-z0-9' | head -c $length
+    fi
 }
 
 # 解析端口范围

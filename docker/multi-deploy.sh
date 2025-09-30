@@ -5,6 +5,10 @@
 
 set -e
 
+# 加载平台兼容性工具
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/platform-utils.sh"
+
 # 颜色定义
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -391,8 +395,13 @@ deploy_service() {
 
             read -p "是否启动服务? (y/n): " confirm
             if [[ "$confirm" =~ ^[yY]$ ]]; then
-                docker-compose -f "$compose_file" up -d
-                log_success "服务启动成功!"
+                if run_docker_compose -f "$compose_file" up -d; then
+                    log_success "服务启动成功!"
+                else
+                    log_error "服务启动失败"
+                    suggest_dependencies
+                    exit 1
+                fi
             fi
             ;;
     esac
@@ -434,7 +443,13 @@ main() {
     # 检查依赖
     if ! command -v docker &> /dev/null; then
         log_error "Docker 未安装"
+        suggest_dependencies
         exit 1
+    fi
+
+    # 检查Docker Compose (仅在需要时检查)
+    if ! detect_docker_compose &> /dev/null; then
+        log_warn "Docker Compose 不可用，将只提供 Docker Run 选项"
     fi
 
     # 选择配置
@@ -457,24 +472,37 @@ main() {
     echo
     log_step "选择部署方式:"
     echo -e "  ${CYAN}1)${NC} Docker Run (直接运行)"
-    echo -e "  ${CYAN}2)${NC} Docker Compose (推荐)"
+
+    local has_compose=false
+    if detect_docker_compose &> /dev/null; then
+        echo -e "  ${CYAN}2)${NC} Docker Compose (推荐)"
+        has_compose=true
+    else
+        echo -e "  ${CYAN}2)${NC} Docker Compose (不可用 - 未安装)"
+    fi
     echo
 
     while true; do
-        read -p "请选择 (1-2): " deploy_choice
-        case "$deploy_choice" in
-            1)
-                deploy_service "$SELECTED_CONFIG" "docker-run"
-                break
-                ;;
-            2)
-                deploy_service "$SELECTED_CONFIG" "docker-compose"
-                break
-                ;;
-            *)
-                log_error "请输入有效选项 (1-2)"
-                ;;
-        esac
+        if [[ "$has_compose" == "true" ]]; then
+            read -p "请选择 (1-2): " deploy_choice
+            case "$deploy_choice" in
+                1)
+                    deploy_service "$SELECTED_CONFIG" "docker-run"
+                    break
+                    ;;
+                2)
+                    deploy_service "$SELECTED_CONFIG" "docker-compose"
+                    break
+                    ;;
+                *)
+                    log_error "请输入有效选项 (1-2)"
+                    ;;
+            esac
+        else
+            log_warn "Docker Compose 不可用，自动使用 Docker Run"
+            deploy_service "$SELECTED_CONFIG" "docker-run"
+            break
+        fi
     done
 
     # 显示部署结果
