@@ -1,0 +1,217 @@
+version: '3.8'
+
+services:
+  # VLESS Reality 配置示例
+  vless-reality:
+    build: .
+    container_name: singbox-vless-reality
+    environment:
+      # 协议配置
+      PROTOCOL: "vless-reality"
+      PORT: "443"
+      UUID: "550e8400-e29b-41d4-a716-446655440000"  # 请更改为你的UUID
+
+      # Reality 配置
+      SERVER_NAME: "www.cloudflare.com"
+      PRIVATE_KEY: ""  # 留空自动生成
+      PUBLIC_KEY: ""   # 留空自动生成
+      TRANSPORT: "tcp"
+      FLOW: "xtls-rprx-vision"
+
+      # 日志配置
+      LOG_LEVEL: "info"
+      SNIFF_ENABLED: "true"
+      SNIFF_OVERRIDE_DESTINATION: "true"
+    ports:
+      - "443:443"
+    volumes:
+      - ./data/vless-reality/logs:/var/log/sing-box
+      - ./data/vless-reality/config:/etc/sing-box
+    restart: unless-stopped
+    networks:
+      - singbox-network
+    profiles:
+      - vless-reality
+
+  # Trojan 配置示例
+  trojan:
+    build: .
+    container_name: singbox-trojan
+    environment:
+      PROTOCOL: "trojan"
+      PORT: "8443"
+      TROJAN_PASSWORD: "your-strong-password"
+      TRANSPORT: "tcp"
+
+      LOG_LEVEL: "info"
+      SNIFF_ENABLED: "true"
+      SNIFF_OVERRIDE_DESTINATION: "true"
+    ports:
+      - "8443:8443"
+    volumes:
+      - ./data/trojan/logs:/var/log/sing-box
+      - ./data/trojan/config:/etc/sing-box
+    restart: unless-stopped
+    networks:
+      - singbox-network
+    profiles:
+      - trojan
+
+  # VMess WebSocket TLS 配置示例
+  vmess-ws-tls:
+    build: .
+    container_name: singbox-vmess-ws
+    environment:
+      PROTOCOL: "vmess-ws-tls"
+      PORT: "8080"
+      UUID: "550e8400-e29b-41d4-a716-446655440001"
+      VMESS_SECURITY: "auto"
+
+      # WebSocket 配置
+      TRANSPORT: "ws"
+      WS_PATH: "/vmess-ws"
+      HOST_HEADER: "example.com"
+
+      LOG_LEVEL: "info"
+      SNIFF_ENABLED: "true"
+      SNIFF_OVERRIDE_DESTINATION: "true"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data/vmess-ws/logs:/var/log/sing-box
+      - ./data/vmess-ws/config:/etc/sing-box
+    restart: unless-stopped
+    networks:
+      - singbox-network
+    profiles:
+      - vmess-ws
+
+  # Shadowsocks 配置示例
+  shadowsocks:
+    build: .
+    container_name: singbox-shadowsocks
+    environment:
+      PROTOCOL: "shadowsocks"
+      PORT: "8388"
+      SS_METHOD: "2022-blake3-aes-256-gcm"
+      SS_PASSWORD: ""  # 留空自动生成
+
+      LOG_LEVEL: "info"
+      SNIFF_ENABLED: "true"
+      SNIFF_OVERRIDE_DESTINATION: "true"
+    ports:
+      - "8388:8388"
+    volumes:
+      - ./data/shadowsocks/logs:/var/log/sing-box
+      - ./data/shadowsocks/config:/etc/sing-box
+    restart: unless-stopped
+    networks:
+      - singbox-network
+    profiles:
+      - shadowsocks
+
+  # Hysteria2 配置示例
+  hysteria2:
+    build: .
+    container_name: singbox-hysteria2
+    environment:
+      PROTOCOL: "hysteria2"
+      PORT: "36712"
+      TROJAN_PASSWORD: "your-hysteria2-password"
+
+      LOG_LEVEL: "info"
+      SNIFF_ENABLED: "true"
+      SNIFF_OVERRIDE_DESTINATION: "true"
+    ports:
+      - "36712:36712/udp"
+    volumes:
+      - ./data/hysteria2/logs:/var/log/sing-box
+      - ./data/hysteria2/config:/etc/sing-box
+    restart: unless-stopped
+    networks:
+      - singbox-network
+    profiles:
+      - hysteria2
+
+  # TUIC 配置示例
+  tuic:
+    build: .
+    container_name: singbox-tuic
+    environment:
+      PROTOCOL: "tuic"
+      PORT: "8443"
+      UUID: "550e8400-e29b-41d4-a716-446655440002"
+      TROJAN_PASSWORD: "your-tuic-password"
+
+      LOG_LEVEL: "info"
+      SNIFF_ENABLED: "true"
+      SNIFF_OVERRIDE_DESTINATION: "true"
+    ports:
+      - "8443:8443/udp"
+    volumes:
+      - ./data/tuic/logs:/var/log/sing-box
+      - ./data/tuic/config:/etc/sing-box
+    restart: unless-stopped
+    networks:
+      - singbox-network
+    profiles:
+      - tuic
+
+  # Socks5 代理配置示例
+  socks5:
+    build: .
+    container_name: singbox-socks5
+    environment:
+      PROTOCOL: "socks"
+      PORT: "1080"
+      SOCKS_USER: "proxyuser"
+      SOCKS_PASS: "proxypass"
+
+      LOG_LEVEL: "info"
+      SNIFF_ENABLED: "true"
+      SNIFF_OVERRIDE_DESTINATION: "true"
+    ports:
+      - "1080:1080"
+    volumes:
+      - ./data/socks5/logs:/var/log/sing-box
+      - ./data/socks5/config:/etc/sing-box
+    restart: unless-stopped
+    networks:
+      - singbox-network
+    profiles:
+      - socks5
+
+  # 多协议混合配置示例
+  mixed-protocols:
+    build: .
+    container_name: singbox-mixed
+    environment:
+      # 可以通过外部配置文件实现多协议
+      PROTOCOL: "vless-reality"
+      PORT: "443"
+      UUID: "550e8400-e29b-41d4-a716-446655440003"
+      SERVER_NAME: "www.amazon.com"
+
+      LOG_LEVEL: "debug"
+      SNIFF_ENABLED: "true"
+      SNIFF_OVERRIDE_DESTINATION: "true"
+    ports:
+      - "443:443"
+      - "8080:8080"
+      - "8443:8443"
+    volumes:
+      - ./data/mixed/logs:/var/log/sing-box
+      - ./data/mixed/config:/etc/sing-box
+      - ./config/mixed-config.json:/etc/sing-box/config.json:ro  # 外部配置文件
+    restart: unless-stopped
+    networks:
+      - singbox-network
+    profiles:
+      - mixed
+
+networks:
+  singbox-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

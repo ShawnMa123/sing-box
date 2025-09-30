@@ -1,0 +1,180 @@
+version: '3.8'
+
+services:
+  # 多协议混合部署 - 主要服务
+  singbox-multi:
+    build: .
+    container_name: singbox-multi
+    environment:
+      # 多协议配置格式: protocol:port_range:count,protocol:port_range:count
+      # protocol: reality/hy2/trojan/ss (支持的协议)
+      # port_range: 单端口(1000) 或 端口范围(1000-1003)
+      # count: 要配置的端口数量
+      MULTI_PROTOCOL_CONFIG: "reality:1000-1003:4,hy2:2000-2003:4"
+
+      # 全局配置
+      LOG_LEVEL: "info"
+      SNIFF_ENABLED: "true"
+      SNIFF_OVERRIDE_DESTINATION: "true"
+
+      # Reality 特定配置
+      REALITY_SERVER_NAME: "www.cloudflare.com"
+
+      # Shadowsocks 配置 (如果使用ss协议)
+      SS_METHOD: "2022-blake3-aes-256-gcm"
+
+      # 可选: 为特定协议设置固定密码
+      # HY2_PASSWORD: "your-hy2-password"
+      # TROJAN_PASSWORD: "your-trojan-password"
+      # SS_PASSWORD: "your-ss-password"
+
+    # 端口映射 - 根据配置自动调整
+    ports:
+      # Reality 端口范围 1000-1003
+      - "1000:1000"
+      - "1001:1001"
+      - "1002:1002"
+      - "1003:1003"
+
+      # Hysteria2 端口范围 2000-2003 (UDP)
+      - "2000:2000/udp"
+      - "2001:2001/udp"
+      - "2002:2002/udp"
+      - "2003:2003/udp"
+
+    volumes:
+      - ./data/multi/logs:/var/log/sing-box
+      - ./data/multi/config:/etc/sing-box
+
+    # 使用多协议入口脚本
+    entrypoint: ["/opt/sing-box/scripts/entrypoint-multi.sh"]
+    command: ["run", "-c", "/etc/sing-box/config.json"]
+
+    restart: unless-stopped
+    networks:
+      - singbox-network
+
+  # 预定义配置示例 1: Reality + Hysteria2
+  reality-hy2:
+    build: .
+    container_name: singbox-reality-hy2
+    environment:
+      MULTI_PROTOCOL_CONFIG: "reality:443-446:4,hy2:8443-8446:4"
+      LOG_LEVEL: "info"
+      REALITY_SERVER_NAME: "www.amazon.com"
+    ports:
+      - "443:443"
+      - "444:444"
+      - "445:445"
+      - "446:446"
+      - "8443:8443/udp"
+      - "8444:8444/udp"
+      - "8445:8445/udp"
+      - "8446:8446/udp"
+    volumes:
+      - ./data/reality-hy2/logs:/var/log/sing-box
+      - ./data/reality-hy2/config:/etc/sing-box
+    entrypoint: ["/opt/sing-box/scripts/entrypoint-multi.sh"]
+    command: ["run", "-c", "/etc/sing-box/config.json"]
+    restart: unless-stopped
+    networks:
+      - singbox-network
+    profiles:
+      - reality-hy2
+
+  # 预定义配置示例 2: 全协议部署
+  all-protocols:
+    build: .
+    container_name: singbox-all-protocols
+    environment:
+      MULTI_PROTOCOL_CONFIG: "reality:1000-1001:2,hy2:2000-2001:2,trojan:3000-3001:2,ss:4000-4001:2"
+      LOG_LEVEL: "info"
+      REALITY_SERVER_NAME: "www.cloudflare.com"
+      SS_METHOD: "2022-blake3-aes-256-gcm"
+    ports:
+      # Reality
+      - "1000:1000"
+      - "1001:1001"
+      # Hysteria2
+      - "2000:2000/udp"
+      - "2001:2001/udp"
+      # Trojan
+      - "3000:3000"
+      - "3001:3001"
+      # Shadowsocks
+      - "4000:4000"
+      - "4001:4001"
+    volumes:
+      - ./data/all-protocols/logs:/var/log/sing-box
+      - ./data/all-protocols/config:/etc/sing-box
+    entrypoint: ["/opt/sing-box/scripts/entrypoint-multi.sh"]
+    command: ["run", "-c", "/etc/sing-box/config.json"]
+    restart: unless-stopped
+    networks:
+      - singbox-network
+    profiles:
+      - all-protocols
+
+  # 高密度部署示例 - 大量端口
+  high-density:
+    build: .
+    container_name: singbox-high-density
+    environment:
+      # 每个协议10个端口
+      MULTI_PROTOCOL_CONFIG: "reality:10000-10009:10,hy2:20000-20009:10"
+      LOG_LEVEL: "warn"  # 降低日志级别
+      REALITY_SERVER_NAME: "www.microsoft.com"
+    ports:
+      # Reality 10000-10009
+      - "10000-10009:10000-10009"
+      # Hysteria2 20000-20009
+      - "20000-20009:20000-20009/udp"
+    volumes:
+      - ./data/high-density/logs:/var/log/sing-box
+      - ./data/high-density/config:/etc/sing-box
+    entrypoint: ["/opt/sing-box/scripts/entrypoint-multi.sh"]
+    command: ["run", "-c", "/etc/sing-box/config.json"]
+    restart: unless-stopped
+    networks:
+      - singbox-network
+    profiles:
+      - high-density
+
+  # 自定义端口范围部署
+  custom-range:
+    build: .
+    container_name: singbox-custom
+    environment:
+      # 使用环境变量文件中的配置
+      MULTI_PROTOCOL_CONFIG: "${CUSTOM_PROTOCOL_CONFIG:-reality:5000-5003:4,hy2:6000-6003:4}"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      REALITY_SERVER_NAME: "${REALITY_SERVER_NAME:-www.apple.com}"
+    ports:
+      # 通过环境变量动态配置端口映射
+      # 注意: docker-compose 不支持动态端口映射，需要在运行时指定
+      - "5000-5003:5000-5003"
+      - "6000-6003:6000-6003/udp"
+    volumes:
+      - ./data/custom/logs:/var/log/sing-box
+      - ./data/custom/config:/etc/sing-box
+    entrypoint: ["/opt/sing-box/scripts/entrypoint-multi.sh"]
+    command: ["run", "-c", "/etc/sing-box/config.json"]
+    restart: unless-stopped
+    networks:
+      - singbox-network
+    profiles:
+      - custom
+
+networks:
+  singbox-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+
+# 数据卷 (可选)
+volumes:
+  singbox-multi-logs:
+    driver: local
+  singbox-multi-config:
+    driver: local
