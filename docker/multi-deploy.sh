@@ -300,6 +300,40 @@ generate_port_mappings() {
     echo "${mappings[@]}"
 }
 
+# 生成Docker Compose端口映射 (YAML格式)
+generate_compose_port_mappings() {
+    local config="$1"
+    local mappings=()
+
+    IFS=',' read -ra CONFIGS <<< "$config"
+
+    for cfg in "${CONFIGS[@]}"; do
+        IFS=':' read -ra PARTS <<< "$cfg"
+        local protocol="${PARTS[0]}"
+        local port_range="${PARTS[1]}"
+        local count="${PARTS[2]}"
+
+        # 确定协议类型 (TCP/UDP)
+        local proto_suffix=""
+        if [[ "$protocol" == "hy2" ]]; then
+            proto_suffix="/udp"
+        fi
+
+        # 解析端口范围
+        if [[ "$port_range" =~ ^([0-9]+)-([0-9]+)$ ]]; then
+            local start="${BASH_REMATCH[1]}"
+            local end="${BASH_REMATCH[2]}"
+            for ((i=0, port=start; i<count && port<=end; i++, port++)); do
+                mappings+=("\"$port:$port$proto_suffix\"")
+            done
+        elif [[ "$port_range" =~ ^[0-9]+$ ]]; then
+            mappings+=("\"$port_range:$port_range$proto_suffix\"")
+        fi
+    done
+
+    printf '%s\n' "${mappings[@]}"
+}
+
 # 生成docker run命令
 generate_docker_command() {
     local config="$1"
@@ -328,8 +362,6 @@ generate_compose_config() {
     local config="$1"
     local service_name="${2:-singbox-multi}"
 
-    local port_mappings=($(generate_port_mappings "$config"))
-
     cat << EOF
 version: '3.8'
 
@@ -344,8 +376,9 @@ services:
     ports:
 EOF
 
-    for mapping in "${port_mappings[@]}"; do
-        echo "      - \"$mapping\""
+    # 使用专门的Compose端口映射函数
+    generate_compose_port_mappings "$config" | while read -r mapping; do
+        echo "      - $mapping"
     done
 
     cat << EOF
